@@ -58,12 +58,15 @@ def extract_json_payload(raw_output: str) -> str:
     # Case 1: whole-response fenced block
     if text.startswith("```"):
         # Drop the opening fence line (which may carry a language tag
-        # like "```json"), then strip a trailing fence if present.
+        # like "```json"), then cut at the closing fence by content —
+        # it may not be the last thing in the string (sign-off prose
+        # can follow it).
         first_newline = text.find("\n")
         if first_newline != -1:
             inner = text[first_newline + 1 :]
-            if inner.rstrip().endswith("```"):
-                inner = inner.rstrip()[: -len("```")]
+            closing_idx = inner.find("```")
+            if closing_idx != -1:
+                inner = inner[:closing_idx]
             return inner.strip()
 
     # Case 2: fenced block embedded in prose. Match the first ```json
@@ -72,13 +75,17 @@ def extract_json_payload(raw_output: str) -> str:
     if fence_match:
         return fence_match.group(1).strip()
 
-    # Case 3: bare JSON preceded by prose. Anchor at the first { or [
-    # that opens a JSON value.
+    # Case 3: bare JSON preceded by prose. Anchor at whichever of { or [
+    # opens the JSON value, picking the one that occurs earliest —
+    # trying "{" unconditionally would jump past a leading "[" when the
+    # payload is a bracket-wrapped value (e.g. "results: [{...}]").
+    best_idx = None
     for opener in ("{", "["):
         idx = text.find(opener)
-        if idx > 0:  # strictly prose-before; idx == 0 already parses
-            text = text[idx:].strip()
-            break
+        if idx > 0 and (best_idx is None or idx < best_idx):  # strictly prose-before
+            best_idx = idx
+    if best_idx is not None:
+        text = text[best_idx:].strip()
 
     # Defensive: strip markdown-bold around keys (#638). Anchored regex only
     # matches at line-start or after JSON delimiters, so legitimate `**`
