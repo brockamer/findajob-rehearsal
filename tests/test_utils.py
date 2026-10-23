@@ -537,6 +537,13 @@ class TestExtractJsonPayload:
         text = '```\n{"relevance_score": 7}\n```'
         assert extract_json_payload(text) == '{"relevance_score": 7}'
 
+    def test_strips_whole_response_fence_with_trailing_prose(self):
+        # The closing fence is not the last thing in the string — a
+        # sign-off follows it. The old endswith("```") check never
+        # matched, so the fence and prose were returned unmodified.
+        text = '```json\n{"relevance_score": 7}\n```\n\nLet me know if you need anything else!'
+        assert extract_json_payload(text) == '{"relevance_score": 7}'
+
     def test_extracts_fenced_json_block_inside_prose(self):
         text = (
             "Looking at this role, here's the analysis:\n\n"
@@ -562,6 +569,13 @@ class TestExtractJsonPayload:
     def test_extracts_bare_json_array_after_prose(self):
         text = "Here are the results:\n[1, 2, 3]"
         assert json.loads(extract_json_payload(text)) == [1, 2, 3]
+
+    def test_extracts_bracket_wrapped_object_after_prose(self):
+        # The real value is an array of objects, so "[" opens it before
+        # the first "{" does. Trying "{" unconditionally jumped past the
+        # leading "[" and left an unparseable trailing "]" behind.
+        text = 'results: [{"relevance_score": 7}]'
+        assert json.loads(extract_json_payload(text)) == [{"relevance_score": 7}]
 
     def test_falls_through_to_input_when_no_json_present(self):
         # Pure prose — extractor returns the input unchanged so the
