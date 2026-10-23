@@ -58,7 +58,7 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          IMAGE="ghcr.io/${REPO_OWNER}/findajob"
+          IMAGE="ghcr.io/${REPO_OWNER}/findajob-rehearsal"  # rehearsal copy: never the real package
           TAGS=""
           if [[ "${GITHUB_REF}" == refs/tags/v*.*.* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"              # v0.1.3
