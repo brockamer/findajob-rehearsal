@@ -60,16 +60,24 @@ def extract_json_payload(raw_output: str) -> str:
         # Drop the opening fence line (which may carry a language tag
         # like "```json"), then cut at the closing fence by content —
         # it may not be the last thing in the string (sign-off prose
-        # can follow it). A candidate "```" is only accepted as the real
-        # closing fence if it is alone on its own line (preceded by "\n",
-        # or degenerately at the start of `inner`) OR nothing but
-        # whitespace follows it to the end of the string — the latter
-        # covers a closing fence glued directly onto the last character
-        # of the JSON with no trailing newline. Either check alone is
-        # insufficient: requiring a preceding newline misses the glued
-        # case, while accepting any "```" by content alone would also
-        # match a literal "```" embedded mid-line inside a JSON string
-        # value (e.g. a snippet field quoting a code fence).
+        # can follow it). A candidate "```" is accepted as the real
+        # closing fence if any of these hold:
+        #   1. it is alone on its own line (preceded by "\n", or
+        #      degenerately at the start of `inner`);
+        #   2. nothing but whitespace follows it to the end of the
+        #      string — a closing fence glued directly onto the last
+        #      character of the JSON with no trailing newline and no
+        #      sign-off after it;
+        #   3. the content before it parses as valid JSON — a closing
+        #      fence glued onto the JSON with no preceding newline AND
+        #      followed by non-whitespace sign-off prose, which checks
+        #      1 and 2 both miss.
+        # None of these alone suffices: requiring a preceding newline
+        # misses the glued cases (2 and 3), while accepting any "```" by
+        # content alone would also match a literal "```" embedded
+        # mid-line inside a JSON string value (e.g. a snippet field
+        # quoting a code fence) — check 3 guards against that by only
+        # firing when the text before it actually parses.
         first_newline = text.find("\n")
         if first_newline != -1:
             inner = text[first_newline + 1 :]
@@ -77,7 +85,14 @@ def extract_json_payload(raw_output: str) -> str:
             for candidate in re.finditer(r"```", inner):
                 preceded_by_newline = candidate.start() == 0 or inner[candidate.start() - 1] == "\n"
                 only_trailing_whitespace_after = inner[candidate.end() :].strip() == ""
-                if preceded_by_newline or only_trailing_whitespace_after:
+                valid_json_before = False
+                if not preceded_by_newline and not only_trailing_whitespace_after:
+                    try:
+                        json.loads(inner[: candidate.start()].strip())
+                        valid_json_before = True
+                    except json.JSONDecodeError:
+                        valid_json_before = False
+                if preceded_by_newline or only_trailing_whitespace_after or valid_json_before:
                     closing_idx = candidate.start()
                     break
             if closing_idx is not None:
