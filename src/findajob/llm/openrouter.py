@@ -339,6 +339,11 @@ def complete(
                 f"Could not reach OpenRouter ({e.reason}).",
                 kind="network",
             )
+        except TimeoutError as e:
+            last_err = OpenRouterError(
+                f"OpenRouter request timed out ({e}).",
+                kind="network",
+            )
         except OpenRouterError as oe:
             # _parse_response can raise OpenRouterError directly (malformed/etc).
             # #737: null-content + length failure path — content was null but
@@ -571,6 +576,11 @@ def complete_stream(
         except urllib.error.URLError as e:
             last_err = OpenRouterError(
                 f"Could not reach OpenRouter ({e.reason}).",
+                kind="network",
+            )
+        except TimeoutError as e:
+            last_err = OpenRouterError(
+                f"OpenRouter request timed out ({e}).",
                 kind="network",
             )
         except Exception as e:  # noqa: BLE001

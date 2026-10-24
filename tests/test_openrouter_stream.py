@@ -266,6 +266,34 @@ def test_retry_transient_then_success(monkeypatch, tmp_path):
     assert not any(c["type"] == "error" for c in chunks)
 
 
+def test_retry_transient_then_success_after_timeout(monkeypatch, tmp_path):
+    """Generator retries once on a read timeout, succeeds on second attempt."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    roles = _setup_role(tmp_path)
+
+    raw = _FIXTURE_PATH.read_bytes()
+    fake_resp = _FakeStreamResp(raw)
+
+    call_count = 0
+
+    def _fake_urlopen(req, timeout=None):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 2:
+            raise TimeoutError("timed out")
+        return fake_resp
+
+    with patch("findajob.llm.openrouter.urllib.request.urlopen", side_effect=_fake_urlopen):
+        chunks = list(complete_stream(role="test_role", prompt="test", roles_dir=roles))
+
+    assert call_count == 2
+    assert len(chunks) == 1
+    assert chunks[0]["type"] == "finish"
+    # No error chunks.
+    assert not any(c["type"] == "error" for c in chunks)
+
+
 # ---------------------------------------------------------------------------
 # Test 5: Retry exhaustion pre-first-yield
 # ---------------------------------------------------------------------------
