@@ -577,6 +577,16 @@ class TestExtractJsonPayload:
         text = 'results: [{"relevance_score": 7}]'
         assert json.loads(extract_json_payload(text)) == [{"relevance_score": 7}]
 
+    def test_plain_object_with_embedded_bracket_in_string_value(self):
+        # No leading prose: the real JSON starts at index 0 with "{". A
+        # later "[" inside a string value (e.g. citing "[1]") must not
+        # win over the earliest opener and cut off the leading object.
+        text = '{"score_status": "scored", "ai_notes": "See [1] for details"}'
+        assert json.loads(extract_json_payload(text)) == {
+            "score_status": "scored",
+            "ai_notes": "See [1] for details",
+        }
+
     def test_falls_through_to_input_when_no_json_present(self):
         # Pure prose — extractor returns the input unchanged so the
         # downstream parser surfaces a meaningful JSONDecodeError.
