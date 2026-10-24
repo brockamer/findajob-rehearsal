@@ -60,17 +60,28 @@ def extract_json_payload(raw_output: str) -> str:
         # Drop the opening fence line (which may carry a language tag
         # like "```json"), then cut at the closing fence by content —
         # it may not be the last thing in the string (sign-off prose
-        # can follow it). The closing fence is anchored to the start of
-        # a line (preceded by "\n" or, degenerately, the start of
-        # `inner`) so a literal "```" embedded mid-line inside a JSON
-        # string value (e.g. a snippet field quoting a code fence) is
-        # not mistaken for it.
+        # can follow it). A candidate "```" is only accepted as the real
+        # closing fence if it is alone on its own line (preceded by "\n",
+        # or degenerately at the start of `inner`) OR nothing but
+        # whitespace follows it to the end of the string — the latter
+        # covers a closing fence glued directly onto the last character
+        # of the JSON with no trailing newline. Either check alone is
+        # insufficient: requiring a preceding newline misses the glued
+        # case, while accepting any "```" by content alone would also
+        # match a literal "```" embedded mid-line inside a JSON string
+        # value (e.g. a snippet field quoting a code fence).
         first_newline = text.find("\n")
         if first_newline != -1:
             inner = text[first_newline + 1 :]
-            closing_match = re.search(r"(?:\n|^)```", inner)
-            if closing_match:
-                inner = inner[: closing_match.start()]
+            closing_idx = None
+            for candidate in re.finditer(r"```", inner):
+                preceded_by_newline = candidate.start() == 0 or inner[candidate.start() - 1] == "\n"
+                only_trailing_whitespace_after = inner[candidate.end() :].strip() == ""
+                if preceded_by_newline or only_trailing_whitespace_after:
+                    closing_idx = candidate.start()
+                    break
+            if closing_idx is not None:
+                inner = inner[:closing_idx]
             return inner.strip()
 
     # Case 2: fenced block embedded in prose. Match the first ```json
