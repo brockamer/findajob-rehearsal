@@ -564,6 +564,15 @@ class TestExtractJsonPayload:
         text = '```json\n{"relevance_score": 7}```'
         assert extract_json_payload(text) == '{"relevance_score": 7}'
 
+    def test_strips_whole_response_fence_glued_to_content_with_trailing_prose(self):
+        # The closing fence is glued directly onto the JSON (no newline
+        # before it) AND followed by non-whitespace sign-off prose. Neither
+        # the preceded-by-newline check nor the trailing-whitespace-only
+        # check matches this shape; only locating the fence by content
+        # (the text before it parses as valid JSON) recovers it.
+        text = '```json\n{"relevance_score": 7}```Thanks for reviewing!'
+        assert extract_json_payload(text) == '{"relevance_score": 7}'
+
     def test_extracts_fenced_json_block_inside_prose(self):
         text = (
             "Looking at this role, here's the analysis:\n\n"
