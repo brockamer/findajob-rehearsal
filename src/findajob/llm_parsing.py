@@ -60,13 +60,17 @@ def extract_json_payload(raw_output: str) -> str:
         # Drop the opening fence line (which may carry a language tag
         # like "```json"), then cut at the closing fence by content —
         # it may not be the last thing in the string (sign-off prose
-        # can follow it).
+        # can follow it). The closing fence is anchored to the start of
+        # a line (preceded by "\n" or, degenerately, the start of
+        # `inner`) so a literal "```" embedded mid-line inside a JSON
+        # string value (e.g. a snippet field quoting a code fence) is
+        # not mistaken for it.
         first_newline = text.find("\n")
         if first_newline != -1:
             inner = text[first_newline + 1 :]
-            closing_idx = inner.find("```")
-            if closing_idx != -1:
-                inner = inner[:closing_idx]
+            closing_match = re.search(r"(?:\n|^)```", inner)
+            if closing_match:
+                inner = inner[: closing_match.start()]
             return inner.strip()
 
     # Case 2: fenced block embedded in prose. Match the first ```json
