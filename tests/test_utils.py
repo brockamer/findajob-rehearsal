@@ -556,6 +556,14 @@ class TestExtractJsonPayload:
             "score": 7,
         }
 
+    def test_strips_whole_response_fence_glued_to_content_no_trailing_newline(self):
+        # The closing fence is glued directly onto the last character of
+        # the JSON with no newline in between and nothing after it. A
+        # closing-fence check that only accepts a fence preceded by a
+        # newline misses this shape entirely.
+        text = '```json\n{"relevance_score": 7}```'
+        assert extract_json_payload(text) == '{"relevance_score": 7}'
+
     def test_extracts_fenced_json_block_inside_prose(self):
         text = (
             "Looking at this role, here's the analysis:\n\n"
