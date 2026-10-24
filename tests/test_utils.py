@@ -544,6 +544,18 @@ class TestExtractJsonPayload:
         text = '```json\n{"relevance_score": 7}\n```\n\nLet me know if you need anything else!'
         assert extract_json_payload(text) == '{"relevance_score": 7}'
 
+    def test_strips_whole_response_fence_with_embedded_backticks_in_value(self):
+        # A string value inside the JSON legitimately contains a literal
+        # "```" substring (e.g. quoting a markdown code fence). The closing
+        # fence must be found by anchoring to a line start, not by the
+        # first "```" occurring anywhere in the body — otherwise it cuts
+        # the payload off mid-string.
+        text = '```json\n{"snippet": "some ``` inline", "score": 7}\n```'
+        assert json.loads(extract_json_payload(text)) == {
+            "snippet": "some ``` inline",
+            "score": 7,
+        }
+
     def test_extracts_fenced_json_block_inside_prose(self):
         text = (
             "Looking at this role, here's the analysis:\n\n"
