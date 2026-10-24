@@ -75,14 +75,18 @@ def extract_json_payload(raw_output: str) -> str:
     if fence_match:
         return fence_match.group(1).strip()
 
-    # Case 3: bare JSON preceded by prose. Anchor at whichever of { or [
-    # opens the JSON value, picking the one that occurs earliest —
+    # Case 3: bare JSON, possibly preceded by prose. Anchor at whichever of
+    # { or [ opens the JSON value, picking the one that occurs earliest —
     # trying "{" unconditionally would jump past a leading "[" when the
-    # payload is a bracket-wrapped value (e.g. "results: [{...}]").
+    # payload is a bracket-wrapped value (e.g. "results: [{...}]"). The
+    # earliest opener may be at index 0 (no leading prose at all); only
+    # excluding found-at-0 (via `idx > 0`) would let a later "[" inside a
+    # string value (e.g. {"ai_notes": "See [1] for details"}) win instead
+    # and cut off the real leading "{".
     best_idx = None
     for opener in ("{", "["):
         idx = text.find(opener)
-        if idx > 0 and (best_idx is None or idx < best_idx):  # strictly prose-before
+        if idx != -1 and (best_idx is None or idx < best_idx):
             best_idx = idx
     if best_idx is not None:
         text = text[best_idx:].strip()
