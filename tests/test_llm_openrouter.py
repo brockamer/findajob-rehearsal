@@ -436,6 +436,29 @@ def test_retry_succeeds_on_second_attempt_after_5xx(monkeypatch, tmp_path):
     assert len(calls) == 2
 
 
+def test_retry_succeeds_on_second_attempt_after_timeout(monkeypatch, tmp_path):
+    """Read timeout on first attempt -> wait -> retry -> success."""
+    roles = tmp_path / "roles"
+    roles.mkdir()
+    (roles / "r.md").write_text("---\nmodel: openrouter:foo/bar\n---\n")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+    monkeypatch.setattr("findajob.llm.openrouter.time.sleep", lambda _: None)
+
+    calls: list[int] = []
+
+    def _attempt(req, timeout=None):
+        calls.append(1)
+        if len(calls) == 1:
+            raise TimeoutError("timed out")
+        return _ok_resp(_success_body(text="recovered"))
+
+    with patch("findajob.llm.openrouter.urllib.request.urlopen", side_effect=_attempt):
+        result = complete(role="r", prompt="hi", roles_dir=roles)
+
+    assert result.text == "recovered"
+    assert len(calls) == 2
+
+
 def test_retry_does_not_retry_auth(monkeypatch, tmp_path):
     """401 fails fast — retrying would exhaust quota for no reason."""
     roles = tmp_path / "roles"
